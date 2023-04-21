@@ -1,0 +1,96 @@
+use ink_lang::contract;
+use ink_prelude::{string::String, vec::Vec};
+use ink_storage::{collections::HashMap, lazy::Lazy};
+
+// Define the NFT struct.
+#[derive(Debug, Clone, PartialEq, Eq, scale::Encode, scale::Decode)]
+pub struct NFT {
+    name: String,
+    description: String,
+    image_url: String,
+    creator: AccountId,
+    owner: AccountId,
+    royalty: u32,
+}
+
+// Define the smart contract.
+#[contract(env = crate::MyEnvironment)]
+mod nft_contract {
+    use super::*;
+
+    // Define the environment interface.
+    #[ink(env = ENV)]
+    pub trait MyEnvironment {
+        type Event: From<Event> + Send + Sync;
+        type Currency: ink_prelude::fmt::Debug + Send + Sync + Clone + PartialEq + Eq + From<Balance>;
+
+        #[ink(message)]
+        fn balance_of(&self, account_id: AccountId) -> Balance;
+
+        #[ink(message, payable)]
+        fn transfer(&mut self, to: AccountId, value: Balance);
+
+        #[ink(message, payable)]
+        fn transfer_from(&mut self, from: AccountId, to: AccountId, value: Balance);
+
+        #[ink(message)]
+        fn nft_exists(&self, id: u64) -> bool;
+
+        #[ink(message)]
+        fn nft_owner(&self, id: u64) -> Option<AccountId>;
+
+        #[ink(message)]
+        fn nft_creator(&self, id: u64) -> Option<AccountId>;
+
+        #[ink(message)]
+        fn nft_royalty(&self, id: u64) -> Option<u32>;
+
+        #[ink(message)]
+        fn nft_metadata(&self, id: u64) -> Option<(String, String, String)>;
+
+        #[ink(message)]
+        fn nft_balance(&self, account_id: AccountId) -> u32;
+
+        #[ink(message)]
+        fn nft_tokens(&self, account_id: AccountId) -> Vec<u64>;
+
+        #[ink(message, payable)]
+        fn mint(&mut self, name: String, description: String, image_url: String, royalty: u32) -> u64;
+
+        #[ink(message)]
+        fn total_supply(&self) -> u64;
+    }
+
+    // Define the NFT smart contract.
+    #[ink(storage)]
+    pub struct NFTContract {
+        nfts: HashMap<u64, NFT>,
+        nft_owners: HashMap<u64, AccountId>,
+        nft_balances: HashMap<AccountId, u32>,
+        nft_tokens: HashMap<AccountId, Vec<u64>>,
+        total_supply: Lazy<u64>,
+        marketplace_account: AccountId,
+    }
+
+    impl NFTContract {
+        #[ink(constructor)]
+        pub fn new(marketplace_account: AccountId) -> Self {
+            Self {
+                nfts: HashMap::new(),
+                nft_owners: HashMap::new(),
+                nft_balances: HashMap::new(),
+                nft_tokens: HashMap::new(),
+                total_supply: Lazy::new(0),
+                marketplace_account,
+            }
+        }
+
+        // Get the balance of Luna Classic in the contract account.
+        fn luna_classic_balance(&self) -> Balance {
+            self.env().balance(self.env().account_id())
+        }
+
+        // Transfer Luna Classic from the caller to the contract account.
+        fn transfer_luna_classic(&mut self, amount: Balance) {
+            let caller = self.env().caller();
+            self.env().transfer_from(caller, self.env().account_id(), amount).expect("
